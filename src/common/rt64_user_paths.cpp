@@ -32,6 +32,19 @@ namespace RT64 {
         }
 
         CoTaskMemFree(knownPath);
+#   elif defined(__ANDROID__)
+        // HOME is "/data" on Android and is not writable by the app, so the generic
+        // Linux branch below would throw out of create_directories on "/data/.rt64".
+        // The JNI layer exports APP_FOLDER_PATH (the app's public data folder) before
+        // native init; fall back to the private files dir if it somehow isn't set.
+        const char *appFolder = getenv("APP_FOLDER_PATH");
+        if (appFolder == nullptr) {
+            appFolder = getenv("APP_PROGRAM_PATH");
+        }
+
+        if (appFolder != nullptr) {
+            resultPath = std::filesystem::path{ appFolder } / appId;
+        }
 #   elif defined(__linux__) || defined(__APPLE__)
         const char *homeDir = getenv("HOME");
         if (homeDir == nullptr) {

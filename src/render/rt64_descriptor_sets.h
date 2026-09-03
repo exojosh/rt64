@@ -291,11 +291,11 @@ namespace RT64 {
     };
 
     struct FramebufferRendererDescriptorTextureSet : RenderDescriptorSetBase {
-#if defined(__ANDROID__)
-        static const int UpperRange = 1024;
-#else
+        // Layout maximum only. The boundless path below allocates just the descriptors
+        // actually in use (boundlessRangeSize), so this costs nothing to leave large --
+        // and it must not be smaller than gTextures[] in FbRendererCommon.hlsli, or the
+        // shader's dynamic indexing runs past the end of the array.
         static const int UpperRange = 8192;
-#endif
 
         uint32_t textureCacheSize = 0;
         uint32_t gTextures;
@@ -307,11 +307,13 @@ namespace RT64 {
             builder.begin();
             gTextures = builder.addTexture(0, UpperRange);
             gTMEM = gTextures;
-#if defined(__ANDROID__)
-            builder.end();
-#else
+            // Must stay boundless on every platform, Android included. Only the boundless
+            // path sets VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT and sizes the set to the
+            // descriptors actually written; a plain fixed-size range leaves the unwritten
+            // tail of the array undefined, and sampling/binding that is undefined behaviour
+            // -- on Adreno it hangs the GPU and the device is lost the moment the game
+            // starts drawing. See PORTING_NOTES.md "GPU hang / VK_ERROR_DEVICE_LOST".
             builder.end(true, textureCacheSize);
-#endif
 
             if (device != nullptr) {
                 create(device);
